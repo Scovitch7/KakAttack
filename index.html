@@ -1,0 +1,691 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>KakAttack - Tisselt onder aanval!</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
+    <link href="https://fonts.googleapis.com/css2?family=Bangers&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --brown-dark: #4A2C0A; --brown: #6B3D1E; --brown-light: #8B5A2B;
+            --yellow: #FFD93D; --yellow-light: #FFF176; --orange: #FF8C00;
+            --green: #4CAF50; --green-dark: #2E7D32; --red: #E53935;
+            --cream: #FFF8E7; --cream-dark: #F5E6C8; --text-dark: #3E2723;
+            --purple: #9C27B0; --purple-dark: #7B1FA2; --gold: #FFD700;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        html, body { height: 100%; width: 100%; overflow: hidden; }
+        body { font-family: 'Nunito', sans-serif; background: var(--cream); color: var(--text-dark); position: fixed; inset: 0; }
+        
+        .welcome-screen { position: fixed; inset: 0; background: linear-gradient(180deg, var(--yellow) 0%, var(--orange) 100%); display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 24px; z-index: 900; transition: transform 0.6s ease; overflow-y: auto; }
+        .welcome-screen.hidden { transform: translateY(-100%); pointer-events: none; }
+        .welcome-poop { font-size: 80px; animation: bounce 1s ease infinite; }
+        @keyframes bounce { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-15px); } }
+        .welcome-title { font-family: 'Bangers', cursive; font-size: clamp(48px, 12vw, 72px); color: var(--brown-dark); text-shadow: 4px 4px 0 var(--yellow-light); margin: 16px 0 8px; }
+        .welcome-subtitle { font-size: 18px; font-weight: 700; color: var(--brown); margin-bottom: 8px; }
+        .welcome-alert { background: var(--red); color: white; padding: 8px 20px; border-radius: 20px; font-weight: 800; font-size: 14px; animation: pulse 1.5s ease infinite; margin-bottom: 32px; }
+        @keyframes pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.05); } }
+        .welcome-story { background: rgba(255,255,255,0.9); border-radius: 20px; padding: 20px; max-width: 340px; margin-bottom: 24px; border: 3px solid var(--brown-light); }
+        .welcome-story p { font-size: 15px; line-height: 1.5; margin-bottom: 12px; }
+        .welcome-story p:last-child { margin-bottom: 0; font-weight: 700; }
+        .input-group { width: 100%; max-width: 320px; margin-bottom: 20px; }
+        .input-label { display: block; font-size: 14px; font-weight: 700; color: var(--brown-dark); margin-bottom: 8px; text-align: center; }
+        .input-field { width: 100%; padding: 16px 20px; font-size: 18px; font-weight: 600; background: white; border: 4px solid var(--brown); border-radius: 16px; color: var(--text-dark); outline: none; text-align: center; }
+        .input-field:focus { border-color: var(--brown-dark); }
+        .start-btn { width: 100%; max-width: 320px; padding: 18px 32px; font-size: 22px; font-family: 'Bangers', cursive; background: var(--green); border: 4px solid var(--green-dark); border-radius: 16px; color: white; cursor: pointer; box-shadow: 0 6px 0 var(--green-dark); position: relative; top: 0; }
+        .start-btn:active { top: 4px; box-shadow: 0 2px 0 var(--green-dark); }
+        .start-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        
+        .game-screen { position: fixed; inset: 0; display: none; flex-direction: column; background: var(--cream); }
+        .game-screen.active { display: flex; }
+        .game-header { padding: 10px 16px; background: linear-gradient(180deg, var(--brown) 0%, var(--brown-dark) 100%); display: flex; align-items: center; justify-content: space-between; z-index: 100; }
+        .header-left { display: flex; align-items: center; gap: 10px; }
+        .player-avatar { width: 42px; height: 42px; background: var(--yellow); border: 3px solid var(--yellow-light); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 22px; }
+        .player-info { display: flex; flex-direction: column; }
+        .player-name { font-weight: 700; font-size: 15px; color: white; }
+        .player-rank { font-size: 11px; color: var(--yellow); font-weight: 600; }
+        .header-right { display: flex; align-items: center; gap: 8px; }
+        .score-box { background: var(--yellow); border-radius: 12px; padding: 6px 12px; display: flex; align-items: center; gap: 6px; border: 3px solid var(--yellow-light); }
+        .score-value { font-family: 'Bangers', cursive; font-size: 18px; color: var(--brown-dark); }
+        .header-btn { width: 38px; height: 38px; background: var(--brown-light); border: none; border-radius: 10px; display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 18px; }
+        .header-btn svg { width: 20px; height: 20px; fill: white; }
+        
+        .combo-bar { background: var(--brown-dark); padding: 8px 16px; display: none; align-items: center; justify-content: center; gap: 12px; }
+        .combo-bar.active { display: flex; }
+        .combo-text { font-family: 'Bangers', cursive; font-size: 18px; color: var(--yellow); }
+        .combo-timer { width: 100px; height: 8px; background: var(--brown); border-radius: 4px; overflow: hidden; }
+        .combo-timer-fill { height: 100%; background: linear-gradient(90deg, var(--yellow) 0%, var(--orange) 100%); transition: width 0.1s linear; }
+        
+        .map-wrapper { flex: 1; position: relative; min-height: 0; }
+        #map { position: absolute !important; inset: 0; width: 100% !important; height: 100% !important; z-index: 1; }
+        .heatmap-canvas { position: absolute !important; inset: 0; width: 100%; height: 100%; z-index: 2; pointer-events: none; opacity: 0; transition: opacity 0.5s ease; }
+        .heatmap-canvas.visible { opacity: 0.7; }
+        .leaflet-container { background: var(--cream) !important; }
+        .leaflet-control-zoom { border: none !important; box-shadow: 0 4px 12px rgba(0,0,0,0.2) !important; }
+        .leaflet-control-zoom a { background: var(--brown) !important; color: white !important; border: none !important; width: 36px !important; height: 36px !important; line-height: 36px !important; }
+        .leaflet-control-zoom-in { border-radius: 10px 10px 0 0 !important; }
+        .leaflet-control-zoom-out { border-radius: 0 0 10px 10px !important; }
+        
+        .poop-marker { filter: drop-shadow(0 2px 4px rgba(0,0,0,0.3)); animation: poopPop 0.4s ease; }
+        @keyframes poopPop { 0% { transform: scale(0); } 100% { transform: scale(1); } }
+        .fresh-poop-marker { animation: freshGlow 1s ease infinite; }
+        @keyframes freshGlow { 0%, 100% { filter: drop-shadow(0 0 8px var(--orange)); } 50% { filter: drop-shadow(0 0 16px var(--yellow)); } }
+        .player-marker { width: 24px; height: 24px; background: var(--green); border: 4px solid white; border-radius: 50%; box-shadow: 0 2px 8px rgba(0,0,0,0.3); }
+        .player-marker-pulse { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 40px; height: 40px; background: rgba(76, 175, 80, 0.3); border-radius: 50%; animation: markerPulse 2s ease-out infinite; }
+        @keyframes markerPulse { 0% { transform: translate(-50%, -50%) scale(0.5); opacity: 1; } 100% { transform: translate(-50%, -50%) scale(2); opacity: 0; } }
+        
+        .feature-panel { position: absolute; top: 12px; left: 12px; z-index: 100; display: flex; flex-direction: column; gap: 8px; }
+        .feature-btn { width: 48px; height: 48px; border-radius: 14px; border: 3px solid white; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 22px; box-shadow: 0 4px 12px rgba(0,0,0,0.2); position: relative; }
+        .feature-btn.heatmap-btn { background: linear-gradient(180deg, #FF6B6B 0%, #EE5A5A 100%); }
+        .feature-btn.heatmap-btn.active { background: linear-gradient(180deg, #4CAF50 0%, #2E7D32 100%); }
+        .feature-btn.navigate-btn { background: linear-gradient(180deg, #4FC3F7 0%, #29B6F6 100%); }
+        .feature-btn.safari-btn { background: linear-gradient(180deg, var(--purple) 0%, var(--purple-dark) 100%); }
+        .feature-btn.safari-btn::after { content: '👑'; position: absolute; top: -8px; right: -8px; font-size: 14px; }
+        
+        .report-btn-container { position: absolute; bottom: 24px; left: 50%; transform: translateX(-50%); z-index: 100; }
+        .report-btn { width: 130px; height: 130px; border-radius: 50%; background: linear-gradient(180deg, var(--orange) 0%, var(--red) 100%); border: 6px solid white; box-shadow: 0 8px 0 var(--brown-dark), 0 12px 30px rgba(0,0,0,0.3); cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; position: relative; top: 0; }
+        .report-btn:active { top: 6px; box-shadow: 0 2px 0 var(--brown-dark); }
+        .report-btn-emoji { font-size: 44px; }
+        .report-btn-text { font-family: 'Bangers', cursive; font-size: 15px; color: white; }
+        
+        .stats-bar { position: absolute; bottom: 170px; left: 12px; right: 12px; background: rgba(255,255,255,0.95); border-radius: 16px; padding: 12px 16px; display: flex; justify-content: space-around; box-shadow: 0 4px 16px rgba(0,0,0,0.15); border: 3px solid var(--cream-dark); z-index: 100; }
+        .stat-item { display: flex; flex-direction: column; align-items: center; gap: 2px; }
+        .stat-value { font-family: 'Bangers', cursive; font-size: 24px; color: var(--brown-dark); }
+        .stat-label { font-size: 11px; font-weight: 700; color: var(--brown-light); text-transform: uppercase; }
+        
+        .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 500; opacity: 0; visibility: hidden; transition: all 0.3s ease; }
+        .modal-overlay.visible { opacity: 1; visibility: visible; }
+        .report-modal, .navigate-modal { position: fixed; bottom: -100%; left: 0; right: 0; background: white; border-radius: 24px 24px 0 0; padding: 24px; z-index: 600; transition: bottom 0.4s ease; max-height: 85vh; overflow-y: auto; }
+        .report-modal.open, .navigate-modal.open { bottom: 0; }
+        .modal-handle { width: 48px; height: 5px; background: #DDD; border-radius: 3px; margin: 0 auto 16px; }
+        .modal-title { font-family: 'Bangers', cursive; font-size: 28px; color: var(--brown-dark); text-align: center; margin-bottom: 4px; }
+        .modal-subtitle { font-size: 14px; color: var(--brown-light); text-align: center; margin-bottom: 20px; }
+        .option-section { margin-bottom: 20px; }
+        .option-label { font-size: 14px; font-weight: 800; color: var(--brown-dark); margin-bottom: 10px; }
+        .option-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
+        .option-btn { padding: 14px 12px; background: var(--cream); border: 3px solid var(--cream-dark); border-radius: 14px; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 4px; }
+        .option-btn.selected { background: var(--yellow); border-color: var(--orange); }
+        .option-btn-emoji { font-size: 28px; }
+        .option-btn-text { font-size: 13px; font-weight: 700; color: var(--brown-dark); }
+        .option-btn-desc { font-size: 10px; color: var(--brown-light); }
+        .submit-btn { width: 100%; padding: 18px; font-family: 'Bangers', cursive; font-size: 24px; background: var(--green); border: 4px solid var(--green-dark); border-radius: 16px; color: white; cursor: pointer; box-shadow: 0 6px 0 var(--green-dark); margin-top: 8px; }
+        .submit-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        
+        .fresh-poop-card { background: linear-gradient(135deg, var(--yellow-light) 0%, var(--yellow) 100%); border-radius: 16px; padding: 20px; margin-top: 16px; border: 3px solid var(--orange); }
+        .fresh-poop-header { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
+        .fresh-poop-icon { font-size: 48px; }
+        .fresh-poop-info h3 { font-family: 'Bangers', cursive; font-size: 20px; color: var(--brown-dark); }
+        .fresh-poop-info p { font-size: 13px; color: var(--brown); }
+        .fresh-poop-details { display: flex; gap: 16px; margin-bottom: 16px; }
+        .fresh-poop-detail { display: flex; align-items: center; gap: 6px; font-size: 14px; font-weight: 600; color: var(--brown-dark); }
+        .navigate-btn-action { width: 100%; padding: 16px; font-family: 'Bangers', cursive; font-size: 20px; background: var(--green); border: 4px solid var(--green-dark); border-radius: 14px; color: white; cursor: pointer; box-shadow: 0 4px 0 var(--green-dark); }
+        .no-fresh-poop { text-align: center; padding: 40px 20px; }
+        .no-fresh-poop-icon { font-size: 64px; margin-bottom: 16px; opacity: 0.5; }
+        .no-fresh-poop h3 { font-family: 'Bangers', cursive; font-size: 24px; color: var(--brown); margin-bottom: 8px; }
+        
+        .safari-modal { position: fixed; inset: 0; background: white; z-index: 700; transform: translateX(100%); transition: transform 0.4s ease; overflow-y: auto; }
+        .safari-modal.open { transform: translateX(0); }
+        .safari-header { background: linear-gradient(180deg, var(--purple) 0%, var(--purple-dark) 100%); padding: 20px; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 10; }
+        .safari-title { font-family: 'Bangers', cursive; font-size: 26px; color: white; }
+        .safari-close { width: 40px; height: 40px; background: rgba(255,255,255,0.2); border: none; border-radius: 10px; display: flex; align-items: center; justify-content: center; cursor: pointer; }
+        .safari-close svg { width: 20px; height: 20px; fill: white; }
+        .safari-locked { padding: 40px 24px; text-align: center; }
+        .safari-locked-icon { font-size: 80px; margin-bottom: 20px; }
+        .safari-locked h2 { font-family: 'Bangers', cursive; font-size: 32px; color: var(--purple); margin-bottom: 12px; }
+        .safari-locked p { font-size: 15px; line-height: 1.6; margin-bottom: 24px; }
+        .safari-features { background: var(--cream); border-radius: 16px; padding: 20px; margin-bottom: 24px; text-align: left; }
+        .safari-features h3 { font-family: 'Bangers', cursive; font-size: 20px; color: var(--brown-dark); margin-bottom: 12px; text-align: center; }
+        .safari-feature-item { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 2px dashed var(--cream-dark); }
+        .safari-feature-item:last-child { border-bottom: none; }
+        .safari-feature-item span:first-child { font-size: 24px; }
+        .safari-feature-item span:last-child { font-size: 14px; }
+        .safari-price { background: linear-gradient(135deg, var(--gold) 0%, #FFA500 100%); border-radius: 16px; padding: 20px; margin-bottom: 20px; }
+        .safari-price-tag { font-family: 'Bangers', cursive; font-size: 48px; color: var(--brown-dark); }
+        .safari-price-sub { font-size: 14px; color: var(--brown); }
+        .safari-buy-btn { width: 100%; padding: 18px; font-family: 'Bangers', cursive; font-size: 24px; background: var(--purple); border: 4px solid var(--purple-dark); border-radius: 16px; color: white; cursor: pointer; box-shadow: 0 6px 0 var(--purple-dark); }
+        .safari-content { padding: 20px; display: none; }
+        .safari-content.unlocked { display: block; }
+        .safari-guide { background: linear-gradient(135deg, var(--cream) 0%, var(--cream-dark) 100%); border-radius: 16px; padding: 20px; margin-bottom: 20px; border: 3px solid var(--brown-light); }
+        .safari-guide-header { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
+        .safari-guide-avatar { width: 60px; height: 60px; background: var(--yellow); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 32px; border: 3px solid var(--orange); }
+        .safari-guide-info h3 { font-family: 'Bangers', cursive; font-size: 22px; color: var(--brown-dark); }
+        .safari-guide-info p { font-size: 13px; color: var(--brown); }
+        .safari-guide-speech { background: white; border-radius: 16px; padding: 16px; font-size: 15px; line-height: 1.6; transition: opacity 0.3s ease; }
+        .safari-tour-title { font-family: 'Bangers', cursive; font-size: 24px; color: var(--purple); margin-bottom: 16px; }
+        .safari-fact-card { background: white; border-radius: 16px; padding: 16px; margin-bottom: 12px; border: 3px solid var(--cream-dark); }
+        .safari-fact-card h4 { font-family: 'Bangers', cursive; font-size: 18px; color: var(--brown-dark); margin-bottom: 8px; }
+        .safari-fact-card p { font-size: 14px; line-height: 1.5; }
+        .safari-consistency-chart { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin-top: 16px; }
+        .consistency-item { background: var(--cream); border-radius: 12px; padding: 14px; text-align: center; }
+        .consistency-item .emoji { font-size: 32px; margin-bottom: 6px; }
+        .consistency-item .name { font-weight: 700; font-size: 13px; color: var(--brown-dark); }
+        .consistency-item .desc { font-size: 11px; color: var(--brown-light); }
+        
+        .payment-modal { position: fixed; inset: 0; background: rgba(0,0,0,0.8); z-index: 800; display: none; align-items: center; justify-content: center; padding: 24px; }
+        .payment-modal.visible { display: flex; }
+        .payment-card { background: white; border-radius: 24px; padding: 28px; max-width: 340px; width: 100%; text-align: center; }
+        .payment-icon { font-size: 64px; margin-bottom: 16px; }
+        .payment-title { font-family: 'Bangers', cursive; font-size: 28px; color: var(--purple); margin-bottom: 12px; }
+        .payment-desc { font-size: 14px; margin-bottom: 20px; line-height: 1.5; }
+        .payment-qr { background: var(--cream); border-radius: 16px; padding: 20px; margin-bottom: 20px; }
+        .payment-qr-placeholder { width: 150px; height: 150px; background: white; border: 4px solid var(--brown); border-radius: 12px; margin: 0 auto 12px; display: flex; align-items: center; justify-content: center; font-size: 14px; color: var(--brown); text-align: center; padding: 12px; }
+        .payment-account { font-size: 14px; color: var(--brown-dark); font-weight: 700; }
+        .payment-buttons { display: flex; gap: 12px; }
+        .payment-btn { flex: 1; padding: 14px; border-radius: 12px; font-size: 15px; font-weight: 700; cursor: pointer; }
+        .payment-btn.cancel { background: var(--cream); border: 3px solid var(--cream-dark); color: var(--brown); }
+        .payment-btn.confirm { background: var(--green); border: 3px solid var(--green-dark); color: white; }
+        
+        .success-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.8); z-index: 1000; display: none; flex-direction: column; align-items: center; justify-content: center; }
+        .success-overlay.visible { display: flex; }
+        .success-poop { font-size: 100px; animation: successBounce 0.6s ease; }
+        @keyframes successBounce { 0% { transform: scale(0) rotate(-20deg); } 60% { transform: scale(1.2) rotate(10deg); } 100% { transform: scale(1) rotate(0deg); } }
+        .success-title { font-family: 'Bangers', cursive; font-size: 36px; color: var(--yellow); margin: 16px 0 8px; text-shadow: 2px 2px 0 var(--brown-dark); }
+        .success-points { font-family: 'Bangers', cursive; font-size: 48px; color: var(--green); text-shadow: 2px 2px 0 var(--green-dark); }
+        .success-bonus { font-size: 20px; color: var(--orange); font-weight: 700; margin-top: 4px; }
+        
+        .leaderboard-panel { position: fixed; top: 0; right: -100%; width: 100%; max-width: 340px; height: 100%; background: var(--cream); z-index: 700; transition: right 0.4s ease; overflow-y: auto; }
+        .leaderboard-panel.open { right: 0; }
+        .leaderboard-header { background: linear-gradient(180deg, var(--brown) 0%, var(--brown-dark) 100%); padding: 20px; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; }
+        .leaderboard-title { font-family: 'Bangers', cursive; font-size: 28px; color: white; }
+        .close-btn { width: 40px; height: 40px; background: var(--brown-light); border: none; border-radius: 10px; display: flex; align-items: center; justify-content: center; cursor: pointer; }
+        .close-btn svg { width: 20px; height: 20px; fill: white; }
+        .leaderboard-list { padding: 16px; }
+        .leaderboard-item { display: flex; align-items: center; gap: 12px; padding: 14px; background: white; border-radius: 14px; margin-bottom: 10px; border: 3px solid var(--cream-dark); }
+        .leaderboard-item.current-player { background: var(--yellow-light); border-color: var(--yellow); }
+        .leaderboard-rank { width: 36px; height: 36px; background: var(--brown); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-family: 'Bangers', cursive; font-size: 18px; color: white; }
+        .leaderboard-item:nth-child(1) .leaderboard-rank { background: linear-gradient(180deg, #FFD700 0%, #FFA500 100%); color: var(--brown-dark); }
+        .leaderboard-item:nth-child(2) .leaderboard-rank { background: linear-gradient(180deg, #C0C0C0 0%, #A0A0A0 100%); }
+        .leaderboard-item:nth-child(3) .leaderboard-rank { background: linear-gradient(180deg, #CD7F32 0%, #8B4513 100%); }
+        .leaderboard-player { flex: 1; }
+        .leaderboard-player-name { font-weight: 700; font-size: 15px; }
+        .leaderboard-player-reports { font-size: 12px; color: var(--brown-light); }
+        .leaderboard-score { font-family: 'Bangers', cursive; font-size: 22px; color: var(--brown-dark); }
+        .leaderboard-loading { text-align: center; padding: 40px; color: var(--brown-light); }
+        
+        .toast { position: fixed; top: 80px; left: 50%; transform: translateX(-50%) translateY(-100px); background: var(--brown-dark); color: white; padding: 12px 24px; border-radius: 30px; font-weight: 700; z-index: 1000; opacity: 0; transition: all 0.4s ease; }
+        .toast.visible { transform: translateX(-50%) translateY(0); opacity: 1; }
+        .error-message { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 28px; border-radius: 20px; text-align: center; max-width: 300px; width: calc(100% - 40px); z-index: 1000; display: none; border: 4px solid var(--red); }
+        .error-message.visible { display: block; }
+        .error-icon { font-size: 48px; margin-bottom: 12px; }
+        .error-title { font-family: 'Bangers', cursive; font-size: 24px; color: var(--red); margin-bottom: 8px; }
+        .error-text { font-size: 14px; line-height: 1.5; margin-bottom: 20px; }
+        .retry-btn { padding: 14px 32px; font-size: 16px; font-weight: 700; background: var(--orange); border: none; border-radius: 12px; color: white; cursor: pointer; margin-bottom: 10px; }
+        .skip-btn { padding: 10px 24px; font-size: 14px; font-weight: 600; background: transparent; border: 2px solid var(--cream-dark); border-radius: 10px; color: var(--brown); cursor: pointer; }
+        
+        .location-status { position: absolute; top: 12px; right: 12px; z-index: 100; background: rgba(255,255,255,0.9); padding: 8px 14px; border-radius: 20px; font-size: 12px; font-weight: 700; display: flex; align-items: center; gap: 6px; border: 2px solid var(--cream-dark); }
+        .location-status.active { border-color: var(--green); color: var(--green-dark); }
+        .location-status.inactive { border-color: var(--orange); color: var(--orange); }
+        .location-dot { width: 8px; height: 8px; border-radius: 50%; }
+        .location-status.active .location-dot { background: var(--green); }
+        .location-status.inactive .location-dot { background: var(--orange); }
+    </style>
+</head>
+<body>
+    <div class="welcome-screen" id="welcomeScreen">
+        <div class="welcome-poop">💩</div>
+        <h1 class="welcome-title">KakAttack</h1>
+        <p class="welcome-subtitle">Tisselt 2830</p>
+        <div class="welcome-alert">⚠️ DORP ONDER AANVAL ⚠️</div>
+        <div class="welcome-story">
+            <p>Tisselt heeft officieel de meeste hondendrollen per m² van heel België! 🏆💩</p>
+            <p>Onze straten en schoolroutes liggen vol. Kinderen komen thuis met kakschoenen!</p>
+            <p>Word een Drollenjager en help ons dorp te bevrijden! 🦸</p>
+        </div>
+        <div class="input-group">
+            <label class="input-label" for="playerName">Hoe heet jij, held?</label>
+            <input type="text" id="playerName" class="input-field" placeholder="Jouw naam" maxlength="20" autocomplete="off">
+        </div>
+        <button class="start-btn" id="startBtn" disabled>🎮 START DE JACHT!</button>
+    </div>
+
+    <div class="game-screen" id="gameScreen">
+        <header class="game-header">
+            <div class="header-left">
+                <div class="player-avatar">🦸</div>
+                <div class="player-info">
+                    <span class="player-name" id="displayName">Held</span>
+                    <span class="player-rank" id="playerRank">Beginnende Speurder</span>
+                </div>
+            </div>
+            <div class="header-right">
+                <div class="score-box"><span>⭐</span><span class="score-value" id="scoreValue">0</span></div>
+                <button class="header-btn" id="menuBtn"><svg viewBox="0 0 24 24"><path d="M7.5 21H2V9h5.5v12zm7.25-18h-5.5v18h5.5V3zM22 11h-5.5v10H22V11z"/></svg></button>
+            </div>
+        </header>
+        <div class="combo-bar" id="comboBar">
+            <span class="combo-text" id="comboText">🔥 COMBO x2!</span>
+            <div class="combo-timer"><div class="combo-timer-fill" id="comboTimerFill"></div></div>
+        </div>
+        <div class="map-wrapper">
+            <div id="map"></div>
+            <canvas class="heatmap-canvas" id="heatmapCanvas"></canvas>
+            <div class="feature-panel">
+                <button class="feature-btn heatmap-btn" id="heatmapBtn">🔥</button>
+                <button class="feature-btn navigate-btn" id="navigateBtn">🧭</button>
+                <button class="feature-btn safari-btn" id="safariBtn">🦁</button>
+            </div>
+            <div class="location-status inactive" id="locationStatus">
+                <span class="location-dot"></span>
+                <span id="locationText">Locatie zoeken...</span>
+            </div>
+            <div class="stats-bar">
+                <div class="stat-item"><span class="stat-value" id="todayCount">0</span><span class="stat-label">Vandaag</span></div>
+                <div class="stat-item"><span class="stat-value" id="totalCount">0</span><span class="stat-label">Totaal</span></div>
+                <div class="stat-item"><span class="stat-value" id="streakCount">0</span><span class="stat-label">Streak</span></div>
+            </div>
+            <div class="report-btn-container">
+                <button class="report-btn" id="reportBtn"><span class="report-btn-emoji">💩</span><span class="report-btn-text">MELDEN!</span></button>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="modalOverlay"></div>
+    <div class="report-modal" id="reportModal">
+        <div class="modal-handle"></div>
+        <h2 class="modal-title">💩 Drol Gevonden!</h2>
+        <p class="modal-subtitle">Geef details over de vondst</p>
+        <div class="option-section">
+            <div class="option-label">📏 Hoe groot?</div>
+            <div class="option-grid" id="sizeOptions">
+                <button class="option-btn" data-size="small"><span class="option-btn-emoji">🥜</span><span class="option-btn-text">Klein</span><span class="option-btn-desc">Chihuahua</span></button>
+                <button class="option-btn" data-size="medium"><span class="option-btn-emoji">💩</span><span class="option-btn-text">Medium</span><span class="option-btn-desc">Labrador</span></button>
+                <button class="option-btn" data-size="large"><span class="option-btn-emoji">🦣</span><span class="option-btn-text">Groot</span><span class="option-btn-desc">Sint-Bernard</span></button>
+                <button class="option-btn" data-size="huge"><span class="option-btn-emoji">☠️</span><span class="option-btn-text">Gigantisch</span><span class="option-btn-desc">WTF-level</span></button>
+            </div>
+        </div>
+        <div class="option-section">
+            <div class="option-label">⏰ Hoe vers?</div>
+            <div class="option-grid" id="freshnessOptions">
+                <button class="option-btn" data-freshness="fresh"><span class="option-btn-emoji">🔥</span><span class="option-btn-text">Vers</span><span class="option-btn-desc">Dampend</span></button>
+                <button class="option-btn" data-freshness="recent"><span class="option-btn-emoji">😐</span><span class="option-btn-text">Recent</span><span class="option-btn-desc">Vandaag</span></button>
+                <button class="option-btn" data-freshness="old"><span class="option-btn-emoji">🍂</span><span class="option-btn-text">Oud</span><span class="option-btn-desc">Ingedroogd</span></button>
+                <button class="option-btn" data-freshness="fossil"><span class="option-btn-emoji">🪨</span><span class="option-btn-text">Fossiel</span><span class="option-btn-desc">Archeologisch</span></button>
+            </div>
+        </div>
+        <button class="submit-btn" id="submitReport" disabled>✅ RAPPORTEER (+10 pts)</button>
+    </div>
+
+    <div class="navigate-modal" id="navigateModal">
+        <div class="modal-handle"></div>
+        <h2 class="modal-title">🧭 Verse Drol Zoeker</h2>
+        <p class="modal-subtitle">Vind de meest recente melding</p>
+        <div id="freshPoopContent"></div>
+    </div>
+
+    <div class="safari-modal" id="safariModal">
+        <div class="safari-header">
+            <h2 class="safari-title">🦁 Drollensafari</h2>
+            <button class="safari-close" id="safariClose"><svg viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg></button>
+        </div>
+        <div class="safari-locked" id="safariLocked">
+            <div class="safari-locked-icon">🔒</div>
+            <h2>Premium Feature</h2>
+            <p>Ontgrendel de ultieme drollenervaring met onze exclusieve Drollensafari!</p>
+            <div class="safari-features">
+                <h3>Wat krijg je?</h3>
+                <div class="safari-feature-item"><span>🎓</span><span>Persoonlijke gids "Professor Poep"</span></div>
+                <div class="safari-feature-item"><span>📚</span><span>Wetenschappelijke feiten over stoelgang</span></div>
+                <div class="safari-feature-item"><span>💩</span><span>De Bristol Stoelgangschaal uitgelegd</span></div>
+                <div class="safari-feature-item"><span>🐕</span><span>Hondenras vs drolgrootte analyse</span></div>
+                <div class="safari-feature-item"><span>🎯</span><span>Trivia & weetjes over uitwerpselen</span></div>
+            </div>
+            <div class="safari-price"><div class="safari-price-tag">€5,00</div><div class="safari-price-sub">Eenmalige betaling • Levenslang toegang</div></div>
+            <button class="safari-buy-btn" id="safariBuyBtn">👑 Ontgrendel Safari</button>
+        </div>
+        <div class="safari-content" id="safariContent">
+            <div class="safari-guide">
+                <div class="safari-guide-header">
+                    <div class="safari-guide-avatar">🧑‍🔬</div>
+                    <div class="safari-guide-info"><h3>Professor Poep</h3><p>Uw gids in de wereld van uitwerpselen</p></div>
+                </div>
+                <div class="safari-guide-speech" id="guideSpeech">Welkom bij de Drollensafari!</div>
+            </div>
+            <div class="safari-tour-section">
+                <h3 class="safari-tour-title">📊 De Bristol Stoelgangschaal</h3>
+                <div class="safari-fact-card"><h4>🔬 Wetenschappelijk</h4><p>Ontwikkeld in 1997 aan de Universiteit van Bristol. Ook toepasbaar op honden!</p></div>
+                <div class="safari-consistency-chart">
+                    <div class="consistency-item"><div class="emoji">🪨</div><div class="name">Type 1-2</div><div class="desc">Hard</div></div>
+                    <div class="consistency-item"><div class="emoji">🌭</div><div class="name">Type 3-4</div><div class="desc">Ideaal</div></div>
+                    <div class="consistency-item"><div class="emoji">☁️</div><div class="name">Type 5-6</div><div class="desc">Zacht</div></div>
+                    <div class="consistency-item"><div class="emoji">💧</div><div class="name">Type 7</div><div class="desc">Vloeibaar</div></div>
+                </div>
+            </div>
+            <div class="safari-tour-section">
+                <h3 class="safari-tour-title">🐕 Ras vs Grootte</h3>
+                <div class="safari-fact-card"><h4>🥜 Klein</h4><p>Chihuahua: 50-100g/dag</p></div>
+                <div class="safari-fact-card"><h4>💩 Medium</h4><p>Labrador: 150-250g/dag</p></div>
+                <div class="safari-fact-card"><h4>🦣 Groot</h4><p>Duitse Herder: 300-500g/dag</p></div>
+                <div class="safari-fact-card"><h4>☠️ Reus</h4><p>Sint-Bernard: tot 750g/dag!</p></div>
+            </div>
+            <div class="safari-tour-section">
+                <h3 class="safari-tour-title">🎯 Trivia</h3>
+                <div class="safari-fact-card"><h4>🧲 Kompas-effect</h4><p>Honden richten zich noord-zuid uit tijdens het poepen!</p></div>
+                <div class="safari-fact-card"><h4>⚖️ Wettelijk</h4><p>Boete: €50-350. In Tisselt: €0 uitgeschreven!</p></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="payment-modal" id="paymentModal">
+        <div class="payment-card">
+            <div class="payment-icon">💸</div>
+            <h2 class="payment-title">Betaling</h2>
+            <p class="payment-desc">Scan de QR code of maak €5,00 over.</p>
+            <div class="payment-qr">
+                <div class="payment-qr-placeholder">[QR Code]</div>
+                <div class="payment-account">BE12 3456 7890 1234</div>
+            </div>
+            <div class="payment-buttons">
+                <button class="payment-btn cancel" id="paymentCancel">Annuleer</button>
+                <button class="payment-btn confirm" id="paymentConfirm">✓ Betaald</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="success-overlay" id="successOverlay">
+        <div class="success-poop">💩</div>
+        <div class="success-title">DROL GESPOT!</div>
+        <div class="success-points" id="successPoints">+10</div>
+        <div class="success-bonus" id="successBonus"></div>
+    </div>
+
+    <div class="modal-overlay" id="leaderboardOverlay"></div>
+    <div class="leaderboard-panel" id="leaderboardPanel">
+        <div class="leaderboard-header">
+            <h2 class="leaderboard-title">🏆 Leaderboard</h2>
+            <button class="close-btn" id="closeLeaderboard"><svg viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg></button>
+        </div>
+        <div class="leaderboard-list" id="leaderboardList"><div class="leaderboard-loading">Laden...</div></div>
+    </div>
+
+    <div class="error-message" id="errorMessage">
+        <div class="error-icon">📍</div>
+        <h3 class="error-title">Locatie Nodig</h3>
+        <p class="error-text" id="errorText">We hebben je locatie nodig om drollen te melden.</p>
+        <button class="retry-btn" id="retryBtn">🔄 Opnieuw proberen</button>
+        <button class="skip-btn" id="skipBtn">Doorgaan zonder locatie</button>
+    </div>
+
+    <div class="toast" id="toast"></div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+    <!-- Firebase -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
+    
+    <script>
+    (function() {
+        'use strict';
+        
+        // Firebase config - FREE tier Realtime Database
+        // NOTE: Replace with your own Firebase project for production!
+        const firebaseConfig = {
+            apiKey: "AIzaSyDemo-KakAttack-NotReal",
+            authDomain: "kakattack-demo.firebaseapp.com",
+            databaseURL: "https://kakattack-demo-default-rtdb.europe-west1.firebasedatabase.app",
+            projectId: "kakattack-demo",
+            storageBucket: "kakattack-demo.appspot.com",
+            messagingSenderId: "123456789",
+            appId: "1:123456789:web:abcdef"
+        };
+        
+        // Try to init Firebase, fallback to local if fails
+        let db = null;
+        let useFirebase = false;
+        try {
+            firebase.initializeApp(firebaseConfig);
+            db = firebase.database();
+            useFirebase = true;
+            console.log('Firebase initialized');
+        } catch(e) {
+            console.log('Firebase unavailable, using local storage');
+        }
+        
+        const TISSELT = [51.0547, 4.3833], COMBO_MS = 300000, BASE_PTS = 10;
+        const RANKS = [{min:0,t:'Beginnende Speurder'},{min:5,t:'Drol Detective'},{min:15,t:'Kak Kapitein'},{min:30,t:'Poop Patrouilleur'},{min:50,t:'Stront Specialist'},{min:100,t:'Meester Drollenjager'},{min:200,t:'Legende van Tisselt'}];
+        const DEMO = [{lat:51.0552,lng:4.3821,size:'large',freshness:'recent',timestamp:Date.now()-3600000},{lat:51.0538,lng:4.3845,size:'medium',freshness:'old',timestamp:Date.now()-7200000},{lat:51.0561,lng:4.3808,size:'huge',freshness:'fossil',timestamp:Date.now()-86400000},{lat:51.0545,lng:4.3867,size:'small',freshness:'fresh',timestamp:Date.now()-1800000},{lat:51.0533,lng:4.3799,size:'large',freshness:'recent',timestamp:Date.now()-5400000},{lat:51.0541,lng:4.3815,size:'huge',freshness:'fresh',timestamp:Date.now()-900000}];
+        
+        const S = {name:'',score:0,visitorId:'',reports:[],today:0,total:0,combo:0,comboTimer:null,comboLeft:0,lastReport:null,map:null,marker:null,poopMarkers:[],mapReady:false,pos:null,watchId:null,selSize:null,selFresh:null,lb:[],heatmap:false,safari:false,navLine:null,hasLocation:false};
+        const $=id=>document.getElementById(id);
+        const E={welcome:$('welcomeScreen'),game:$('gameScreen'),nameIn:$('playerName'),startBtn:$('startBtn'),dispName:$('displayName'),rank:$('playerRank'),score:$('scoreValue'),today:$('todayCount'),total:$('totalCount'),streak:$('streakCount'),reportBtn:$('reportBtn'),overlay:$('modalOverlay'),reportModal:$('reportModal'),sizeOpts:$('sizeOptions'),freshOpts:$('freshnessOptions'),submitBtn:$('submitReport'),successOv:$('successOverlay'),successPts:$('successPoints'),successBonus:$('successBonus'),comboBar:$('comboBar'),comboTxt:$('comboText'),comboFill:$('comboTimerFill'),menuBtn:$('menuBtn'),lbPanel:$('leaderboardPanel'),lbOverlay:$('leaderboardOverlay'),lbList:$('leaderboardList'),closeLb:$('closeLeaderboard'),errMsg:$('errorMessage'),errTxt:$('errorText'),retryBtn:$('retryBtn'),skipBtn:$('skipBtn'),toast:$('toast'),heatBtn:$('heatmapBtn'),heatCanvas:$('heatmapCanvas'),navBtn:$('navigateBtn'),navModal:$('navigateModal'),freshContent:$('freshPoopContent'),safariBtn:$('safariBtn'),safariModal:$('safariModal'),safariClose:$('safariClose'),safariLocked:$('safariLocked'),safariContent:$('safariContent'),safariBuy:$('safariBuyBtn'),payModal:$('paymentModal'),payCancel:$('paymentCancel'),payConfirm:$('paymentConfirm'),guide:$('guideSpeech'),locStatus:$('locationStatus'),locText:$('locationText')};
+        
+        function genId(){return 'v_'+Math.random().toString(36).substr(2,9);}
+        
+        function init(){load();S.name?showGame():showWelcome();bindEvents();}
+        
+        function load(){
+            const d=localStorage.getItem('kakattack');
+            if(d){
+                const p=JSON.parse(d);
+                S.name=p.name||'';
+                S.score=p.score||0;
+                S.reports=p.reports||[];
+                S.total=p.total||0;
+                S.safari=p.safari||false;
+                S.visitorId=p.visitorId||genId();
+                const td=new Date().toDateString();
+                S.today=S.reports.filter(r=>new Date(r.timestamp).toDateString()===td).length;
+            } else {
+                S.visitorId=genId();
+            }
+            if(!S.reports.length)S.reports=[...DEMO];
+        }
+        
+        function save(){
+            localStorage.setItem('kakattack',JSON.stringify({
+                name:S.name,score:S.score,reports:S.reports,total:S.total,safari:S.safari,visitorId:S.visitorId
+            }));
+        }
+        
+        // Firebase leaderboard functions
+        function syncToFirebase(){
+            if(!useFirebase||!db||!S.name)return;
+            try{
+                db.ref('leaderboard/'+S.visitorId).set({
+                    name:S.name,
+                    score:S.score,
+                    reports:S.total,
+                    updated:Date.now()
+                });
+            }catch(e){console.log('Firebase sync failed');}
+        }
+        
+        function loadLeaderboard(callback){
+            if(!useFirebase||!db){
+                // Fallback to local demo leaderboard
+                callback([
+                    {name:'PoepPansen',score:350,reports:32},
+                    {name:'DrolDansen',score:280,reports:26},
+                    {name:'KakKansen',score:220,reports:20},
+                    {name:'Strontansen',score:165,reports:15},
+                    {name:'MessMansen',score:95,reports:9}
+                ]);
+                return;
+            }
+            try{
+                db.ref('leaderboard').orderByChild('score').limitToLast(20).once('value',snap=>{
+                    const data=[];
+                    snap.forEach(child=>{
+                        data.push(child.val());
+                    });
+                    data.reverse(); // highest first
+                    callback(data.length?data:[{name:'Wees de eerste!',score:0,reports:0}]);
+                });
+            }catch(e){
+                callback([{name:'Laden mislukt',score:0,reports:0}]);
+            }
+        }
+        
+        function bindEvents(){
+            E.nameIn.addEventListener('input',e=>E.startBtn.disabled=e.target.value.trim().length<2);
+            E.startBtn.addEventListener('click',()=>{const n=E.nameIn.value.trim();if(n.length>=2){S.name=n;save();showGame();}});
+            E.nameIn.addEventListener('keypress',e=>{if(e.key==='Enter'&&!E.startBtn.disabled)E.startBtn.click();});
+            E.reportBtn.addEventListener('click',openReport);
+            E.overlay.addEventListener('click',closeModals);
+            E.sizeOpts.querySelectorAll('.option-btn').forEach(b=>b.addEventListener('click',()=>{E.sizeOpts.querySelectorAll('.option-btn').forEach(x=>x.classList.remove('selected'));b.classList.add('selected');S.selSize=b.dataset.size;updSubmit();}));
+            E.freshOpts.querySelectorAll('.option-btn').forEach(b=>b.addEventListener('click',()=>{E.freshOpts.querySelectorAll('.option-btn').forEach(x=>x.classList.remove('selected'));b.classList.add('selected');S.selFresh=b.dataset.freshness;updSubmit();}));
+            E.submitBtn.addEventListener('click',submitReport);
+            E.menuBtn.addEventListener('click',openLb);E.closeLb.addEventListener('click',closeLb);E.lbOverlay.addEventListener('click',closeLb);
+            E.heatBtn.addEventListener('click',toggleHeat);E.navBtn.addEventListener('click',openNav);
+            E.safariBtn.addEventListener('click',openSafari);E.safariClose.addEventListener('click',closeSafari);
+            E.safariBuy.addEventListener('click',openPay);E.payCancel.addEventListener('click',closePay);E.payConfirm.addEventListener('click',confirmPay);
+            E.retryBtn.addEventListener('click',()=>{E.errMsg.classList.remove('visible');getLoc();});
+            E.skipBtn.addEventListener('click',()=>{E.errMsg.classList.remove('visible');S.hasLocation=false;updLocStatus();toast('⚠️ Locatie uit - melden beperkt');});
+        }
+        
+        function showWelcome(){E.welcome.classList.remove('hidden');setTimeout(()=>E.nameIn.focus(),300);}
+        function showGame(){E.welcome.classList.add('hidden');E.game.classList.add('active');E.dispName.textContent=S.name;updUI();setTimeout(initMap,150);syncToFirebase();}
+        function updUI(){E.score.textContent=S.score;E.today.textContent=S.today;E.total.textContent=S.total;E.streak.textContent=S.combo;const r=RANKS.slice().reverse().find(x=>S.total>=x.min);E.rank.textContent=r?r.t:RANKS[0].t;}
+        
+        function updLocStatus(){
+            if(S.hasLocation){
+                E.locStatus.className='location-status active';
+                E.locText.textContent='GPS actief';
+            }else{
+                E.locStatus.className='location-status inactive';
+                E.locText.textContent='Geen GPS';
+            }
+        }
+        
+        function initMap(){
+            if(S.mapReady)return;
+            try{
+                S.map=L.map('map',{center:TISSELT,zoom:16,zoomControl:false});
+                L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'©OSM'}).addTo(S.map);
+                L.control.zoom({position:'topleft'}).addTo(S.map);
+                S.mapReady=true;
+                S.reports.forEach(addPoop);
+                S.map.on('move zoom',()=>{if(S.heatmap)drawHeat();});
+                setTimeout(()=>{S.map.invalidateSize();getLoc();},100);
+            }catch(e){showErr('Kaart kon niet laden');}
+        }
+        
+        function getLoc(){
+            // Check if geolocation available
+            if(!navigator.geolocation){
+                showErr('Je browser ondersteunt geen locatie.');
+                return;
+            }
+            
+            // Check if HTTPS (required for geolocation)
+            if(location.protocol!=='https:'&&location.hostname!=='localhost'&&location.hostname!=='127.0.0.1'){
+                showErr('Locatie werkt alleen via HTTPS. Open de site via https://');
+                return;
+            }
+            
+            E.locText.textContent='Zoeken...';
+            
+            navigator.geolocation.getCurrentPosition(
+                p=>{
+                    E.errMsg.classList.remove('visible');
+                    S.pos=p;
+                    S.hasLocation=true;
+                    updLocStatus();
+                    updPlayer(p);
+                    S.watchId=navigator.geolocation.watchPosition(
+                        x=>{S.pos=x;updPlayer(x);},
+                        ()=>{},
+                        {enableHighAccuracy:true,maximumAge:10000,timeout:10000}
+                    );
+                },
+                e=>{
+                    let msg='Locatie niet beschikbaar.';
+                    if(e.code===1)msg='Geef toegang tot je locatie in je browser instellingen.';
+                    else if(e.code===2)msg='GPS signaal niet gevonden. Ben je binnen?';
+                    else if(e.code===3)msg='Locatie timeout. Probeer opnieuw.';
+                    showErr(msg);
+                },
+                {enableHighAccuracy:true,timeout:15000,maximumAge:0}
+            );
+        }
+        
+        function updPlayer(p){
+            const{latitude:lat,longitude:lng}=p.coords;
+            if(!S.map)return;
+            const ic=L.divIcon({className:'',html:'<div class="player-marker-pulse"></div><div class="player-marker"></div>',iconSize:[24,24],iconAnchor:[12,12]});
+            if(S.marker)S.marker.setLatLng([lat,lng]);
+            else{S.marker=L.marker([lat,lng],{icon:ic}).addTo(S.map);S.map.setView([lat,lng],17);}
+        }
+        
+        function addPoop(r){
+            if(!S.map)return;
+            const sz={small:20,medium:28,large:36,huge:44};
+            const ic=L.divIcon({className:'poop-marker'+(r.freshness==='fresh'?' fresh-poop-marker':''),html:'💩',iconSize:[sz[r.size]||28,sz[r.size]||28],iconAnchor:[(sz[r.size]||28)/2,(sz[r.size]||28)/2]});
+            S.poopMarkers.push(L.marker([r.lat,r.lng],{icon:ic}).addTo(S.map));
+        }
+        
+        function toggleHeat(){S.heatmap=!S.heatmap;E.heatBtn.classList.toggle('active',S.heatmap);E.heatCanvas.classList.toggle('visible',S.heatmap);if(S.heatmap){S.map.setZoom(15);setTimeout(drawHeat,300);toast('🔥 Heatmap actief');}else{clearHeat();toast('Heatmap uit');}}
+        function drawHeat(){const c=E.heatCanvas,ctx=c.getContext('2d');c.width=c.offsetWidth;c.height=c.offsetHeight;ctx.clearRect(0,0,c.width,c.height);S.reports.forEach(r=>{const pt=S.map.latLngToContainerPoint([r.lat,r.lng]);const rad=60,int={small:.3,medium:.5,large:.7,huge:.9}[r.size]||.5;const g=ctx.createRadialGradient(pt.x,pt.y,0,pt.x,pt.y,rad);g.addColorStop(0,`rgba(255,0,0,${int})`);g.addColorStop(.4,`rgba(255,128,0,${int*.6})`);g.addColorStop(.7,`rgba(255,255,0,${int*.3})`);g.addColorStop(1,'rgba(255,255,0,0)');ctx.fillStyle=g;ctx.fillRect(pt.x-rad,pt.y-rad,rad*2,rad*2);});}
+        function clearHeat(){const c=E.heatCanvas,ctx=c.getContext('2d');ctx.clearRect(0,0,c.width,c.height);}
+        
+        function openNav(){E.overlay.classList.add('visible');E.navModal.classList.add('open');renderFresh();}
+        function renderFresh(){const fresh=S.reports.filter(r=>r.freshness==='fresh'||r.freshness==='recent').sort((a,b)=>b.timestamp-a.timestamp);if(!fresh.length){E.freshContent.innerHTML='<div class="no-fresh-poop"><div class="no-fresh-poop-icon">🔍</div><h3>Geen verse drollen</h3><p>Meld er zelf een!</p></div>';return;}const f=fresh[0],ago=timeAgo(f.timestamp),szL={small:'Klein',medium:'Medium',large:'Groot',huge:'Gigantisch'},frL={fresh:'Vers',recent:'Recent'};let dist='';if(S.pos){const d=calcDist(S.pos.coords.latitude,S.pos.coords.longitude,f.lat,f.lng);dist=d<1000?`${Math.round(d)}m`:`${(d/1000).toFixed(1)}km`;}E.freshContent.innerHTML=`<div class="fresh-poop-card"><div class="fresh-poop-header"><div class="fresh-poop-icon">💩</div><div class="fresh-poop-info"><h3>Verse Vondst!</h3><p>${ago}</p></div></div><div class="fresh-poop-details"><div class="fresh-poop-detail"><span>📏</span>${szL[f.size]||'?'}</div><div class="fresh-poop-detail"><span>🔥</span>${frL[f.freshness]||'?'}</div>${dist?`<div class="fresh-poop-detail"><span>📍</span>${dist}</div>`:''}</div><button class="navigate-btn-action" onclick="window.KA.navTo(${f.lat},${f.lng})">🧭 Navigeer</button></div>`;}
+        window.KA={navTo:(lat,lng)=>{closeModals();if(S.navLine)S.map.removeLayer(S.navLine);if(S.pos){S.navLine=L.polyline([[S.pos.coords.latitude,S.pos.coords.longitude],[lat,lng]],{color:'#FF6B35',weight:4,dashArray:'10,10'}).addTo(S.map);S.map.fitBounds(L.latLngBounds([[S.pos.coords.latitude,S.pos.coords.longitude],[lat,lng]]),{padding:[50,50]});}else S.map.setView([lat,lng],18);toast('🧭 Route!');}};
+        function calcDist(lat1,lon1,lat2,lon2){const R=6371e3,r=Math.PI/180,dLat=(lat2-lat1)*r,dLon=(lon2-lon1)*r,a=Math.sin(dLat/2)**2+Math.cos(lat1*r)*Math.cos(lat2*r)*Math.sin(dLon/2)**2;return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));}
+        function timeAgo(ts){const s=Math.floor((Date.now()-ts)/1000);if(s<60)return'Zojuist';const m=Math.floor(s/60);if(m<60)return`${m}min`;const h=Math.floor(m/60);if(h<24)return`${h}u`;return`${Math.floor(h/24)}d`;}
+        
+        function openSafari(){E.safariModal.classList.add('open');if(S.safari){E.safariLocked.style.display='none';E.safariContent.classList.add('unlocked');startGuide();}else{E.safariLocked.style.display='block';E.safariContent.classList.remove('unlocked');}}
+        function closeSafari(){E.safariModal.classList.remove('open');}
+        function startGuide(){const sp=["Welkom! Ik neem je mee door de wereld van hondenuitwerpselen.","Wist je dat honden 0,75g poep/kg/dag produceren?","Tisselt: 500+ nieuwe drollen per dag!","Honden draaien rondjes voor het aardmagnetisch veld!"];let i=0;E.guide.textContent=sp[0];setInterval(()=>{i=(i+1)%sp.length;E.guide.style.opacity=0;setTimeout(()=>{E.guide.textContent=sp[i];E.guide.style.opacity=1;},300);},6000);}
+        function openPay(){E.payModal.classList.add('visible');}
+        function closePay(){E.payModal.classList.remove('visible');}
+        function confirmPay(){S.safari=true;save();closePay();E.safariLocked.style.display='none';E.safariContent.classList.add('unlocked');startGuide();toast('🎉 Safari ontgrendeld!');}
+        
+        function openReport(){
+            if(!S.hasLocation){
+                toast('📍 Geen locatie - kan niet melden');
+                return;
+            }
+            S.selSize=null;S.selFresh=null;
+            E.sizeOpts.querySelectorAll('.option-btn').forEach(b=>b.classList.remove('selected'));
+            E.freshOpts.querySelectorAll('.option-btn').forEach(b=>b.classList.remove('selected'));
+            E.submitBtn.disabled=true;E.submitBtn.textContent='✅ RAPPORTEER (+10 pts)';
+            E.overlay.classList.add('visible');E.reportModal.classList.add('open');
+        }
+        function closeModals(){E.overlay.classList.remove('visible');E.reportModal.classList.remove('open');E.navModal.classList.remove('open');}
+        function updSubmit(){const ok=S.selSize&&S.selFresh;E.submitBtn.disabled=!ok;if(ok){const pts=BASE_PTS+(S.combo>0?S.combo*5:0);E.submitBtn.textContent=`✅ RAPPORTEER (+${pts} pts)`;}}
+        
+        function submitReport(){
+            if(!S.pos||!S.selSize||!S.selFresh)return;
+            const{latitude:lat,longitude:lng}=S.pos.coords,now=Date.now();
+            if(S.lastReport&&now-S.lastReport<COMBO_MS)S.combo++;else S.combo=1;
+            S.lastReport=now;
+            const bonus=S.combo>1?(S.combo-1)*5:0,pts=BASE_PTS+bonus;
+            const r={id:now,lat,lng,size:S.selSize,freshness:S.selFresh,timestamp:now,points:pts};
+            S.reports.push(r);S.score+=pts;S.total++;S.today++;
+            save();syncToFirebase();
+            closeModals();addPoop(r);showSuccess(pts,bonus);startCombo();updUI();
+            if(S.heatmap)drawHeat();
+        }
+        
+        function showSuccess(pts,bonus){E.successPts.textContent=`+${pts}`;E.successBonus.textContent=bonus>0?`🔥 Combo: +${bonus}`:'';E.successOv.classList.add('visible');setTimeout(()=>E.successOv.classList.remove('visible'),2000);}
+        function startCombo(){if(S.comboTimer)clearInterval(S.comboTimer);S.comboLeft=COMBO_MS;E.comboBar.classList.add('active');updCombo();S.comboTimer=setInterval(()=>{S.comboLeft-=100;if(S.comboLeft<=0){clearInterval(S.comboTimer);S.combo=0;E.comboBar.classList.remove('active');updUI();}else updCombo();},100);}
+        function updCombo(){E.comboFill.style.width=`${S.comboLeft/COMBO_MS*100}%`;E.comboTxt.textContent=`${'🔥'.repeat(Math.min(S.combo,5))} COMBO x${S.combo}!`;}
+        
+        function openLb(){
+            E.lbList.innerHTML='<div class="leaderboard-loading">⏳ Laden...</div>';
+            E.lbOverlay.classList.add('visible');
+            E.lbPanel.classList.add('open');
+            loadLeaderboard(renderLb);
+        }
+        function closeLb(){E.lbOverlay.classList.remove('visible');E.lbPanel.classList.remove('open');}
+        function renderLb(data){
+            if(!data||!data.length){
+                E.lbList.innerHTML='<div class="leaderboard-loading">Geen data</div>';
+                return;
+            }
+            E.lbList.innerHTML=data.map((p,i)=>`<div class="leaderboard-item ${p.name===S.name?'current-player':''}"><div class="leaderboard-rank">${i+1}</div><div class="leaderboard-player"><div class="leaderboard-player-name">${p.name||'Anoniem'}</div><div class="leaderboard-player-reports">${p.reports||0} drollen</div></div><div class="leaderboard-score">${p.score||0}</div></div>`).join('');
+        }
+        
+        function showErr(m){E.errTxt.textContent=m;E.errMsg.classList.add('visible');}
+        function toast(m){E.toast.textContent=m;E.toast.classList.add('visible');setTimeout(()=>E.toast.classList.remove('visible'),2500);}
+        
+        document.addEventListener('visibilitychange',()=>{if(!document.hidden&&S.map){S.map.invalidateSize();if(S.heatmap)drawHeat();}});
+        window.addEventListener('resize',()=>{if(S.map){S.map.invalidateSize();if(S.heatmap)drawHeat();}});
+        window.addEventListener('beforeunload',()=>{if(S.watchId)navigator.geolocation.clearWatch(S.watchId);});
+        
+        if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init);else init();
+    })();
+    </script>
+</body>
+</html>
