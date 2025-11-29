@@ -26,8 +26,8 @@
         .welcome-subtitle { font-size: 18px; font-weight: 700; color: var(--brown); margin-bottom: 8px; }
         .welcome-alert { background: var(--red); color: white; padding: 8px 20px; border-radius: 20px; font-weight: 800; font-size: 14px; animation: pulse 1.5s ease infinite; margin-bottom: 32px; }
         @keyframes pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.05); } }
-        .welcome-story { background: rgba(255,255,255,0.9); border-radius: 20px; padding: 20px; max-width: 340px; margin-bottom: 24px; border: 3px solid var(--brown-light); }
-        .welcome-story p { font-size: 15px; line-height: 1.5; margin-bottom: 12px; }
+        .welcome-story { background: rgba(255,255,255,0.9); border-radius: 20px; padding: 20px; max-width: 380px; margin-bottom: 24px; border: 3px solid var(--brown-light); }
+        .welcome-story p { font-size: 14px; line-height: 1.6; margin-bottom: 12px; }
         .welcome-story p:last-child { margin-bottom: 0; font-weight: 700; }
         .input-group { width: 100%; max-width: 320px; margin-bottom: 20px; }
         .input-label { display: block; font-size: 14px; font-weight: 700; color: var(--brown-dark); margin-bottom: 8px; text-align: center; }
@@ -228,9 +228,9 @@
         <p class="welcome-subtitle">Tisselt 2830</p>
         <div class="welcome-alert">⚠️ DORP ONDER AANVAL ⚠️</div>
         <div class="welcome-story">
-            <p>Tisselt heeft officieel de meeste hondendrollen per m² van heel België! 🏆💩</p>
-            <p>Onze straten en schoolroutes liggen vol. Kinderen komen thuis met kakschoenen!</p>
-            <p>Word een Drollenjager en help ons dorp te bevrijden! 🦸</p>
+            <p>Tisselt staat officieel bekend als het dichtstbebladerde drollenrijk van heel België! 🏆💩 Onze straten, pleintjes en schoolroutes zijn een waar kak-paradijs. Kinderen die thuis komen met kakschoenen? Dagelijks tafereel.</p>
+            <p>Maar geen paniek — integendeel! Dit is jouw moment om held te worden.</p>
+            <p>Word een echte Drollenjager en help Tisselt verdedigen in… KakAttack. Markeer elke drol. Verdien badges. Bouw de ultieme heatmap van de Bruine Invasie. 🦸</p>
         </div>
         <div class="input-group">
             <label class="input-label" for="playerName">Hoe heet jij, held?</label>
@@ -417,29 +417,50 @@
     (function() {
         'use strict';
         
-        // Firebase config - FREE tier Realtime Database
-        // NOTE: Replace with your own Firebase project for production!
-        const firebaseConfig = {
-            apiKey: "AIzaSyDemo-KakAttack-NotReal",
-            authDomain: "kakattack-demo.firebaseapp.com",
-            databaseURL: "https://kakattack-demo-default-rtdb.europe-west1.firebasedatabase.app",
-            projectId: "kakattack-demo",
-            storageBucket: "kakattack-demo.appspot.com",
-            messagingSenderId: "123456789",
-            appId: "1:123456789:web:abcdef"
+        // ╔══════════════════════════════════════════════════════════════╗
+        // ║  🔥 FIREBASE CONFIGURATIE                                      ║
+        // ║  Volg FIREBASE_SETUP.md voor instructies                       ║
+        // ║  Vervang de waarden hieronder met jouw eigen Firebase config   ║
+        // ╚══════════════════════════════════════════════════════════════╝
+        
+        const FIREBASE_CONFIG = {
+            apiKey: "JOUW_API_KEY",
+            authDomain: "JOUW_PROJECT_ID.firebaseapp.com",
+            databaseURL: "https://JOUW_PROJECT_ID-default-rtdb.europe-west1.firebasedatabase.app",
+            projectId: "JOUW_PROJECT_ID",
+            storageBucket: "JOUW_PROJECT_ID.appspot.com",
+            messagingSenderId: "JOUW_SENDER_ID",
+            appId: "JOUW_APP_ID"
         };
         
-        // Try to init Firebase, fallback to local if fails
+        // ═══════════════════════════════════════════════════════════════
+        
+        // Firebase initialisatie
         let db = null;
-        let useFirebase = false;
-        try {
-            firebase.initializeApp(firebaseConfig);
-            db = firebase.database();
-            useFirebase = true;
-            console.log('Firebase initialized');
-        } catch(e) {
-            console.log('Firebase unavailable, using local storage');
+        let firebaseReady = false;
+        
+        function initFirebase() {
+            // Check of config is ingevuld
+            if (FIREBASE_CONFIG.apiKey === "JOUW_API_KEY") {
+                console.log('⚠️ Firebase niet geconfigureerd - lokale modus actief');
+                console.log('📖 Zie FIREBASE_SETUP.md voor instructies');
+                return false;
+            }
+            try {
+                firebase.initializeApp(FIREBASE_CONFIG);
+                db = firebase.database();
+                // Test connectie
+                db.ref('.info/connected').on('value', (snap) => {
+                    firebaseReady = snap.val() === true;
+                    console.log(firebaseReady ? '✅ Firebase verbonden!' : '⚠️ Firebase offline');
+                });
+                return true;
+            } catch(e) {
+                console.error('Firebase error:', e);
+                return false;
+            }
         }
+        initFirebase();
         
         const TISSELT = [51.0547, 4.3833], COMBO_MS = 300000, BASE_PTS = 10;
         const RANKS = [{min:0,t:'Beginnende Speurder'},{min:5,t:'Drol Detective'},{min:15,t:'Kak Kapitein'},{min:30,t:'Poop Patrouilleur'},{min:50,t:'Stront Specialist'},{min:100,t:'Meester Drollenjager'},{min:200,t:'Legende van Tisselt'}];
@@ -479,7 +500,7 @@
         
         // Firebase leaderboard functions
         function syncToFirebase(){
-            if(!useFirebase||!db||!S.name)return;
+            if(!firebaseReady||!db||!S.name)return;
             try{
                 db.ref('leaderboard/'+S.visitorId).set({
                     name:S.name,
@@ -491,7 +512,7 @@
         }
         
         function loadLeaderboard(callback){
-            if(!useFirebase||!db){
+            if(!firebaseReady||!db){
                 // Fallback to local demo leaderboard
                 callback([
                     {name:'PoepPansen',score:350,reports:32},
